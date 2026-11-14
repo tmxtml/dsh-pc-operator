@@ -23,10 +23,19 @@ Every pointer action (`move`, `click`, `drag`, `scroll`) must be surrounded by s
 **After the action** — once a pointer action succeeds, call `screen_viewer` again to verify the effect. Until that verification capture arrives:
 
 - further pointer actions are rejected,
-- `start`, `step` and `done` are rejected,
-- only `status` and `stop` (abort) remain available.
+- `start`, `step`, `done` and `stop` are rejected,
+- only `status` remains available.
 
-So the enforced flow is: screenshot → action → screenshot (verify effect + check the next target) → action → … → screenshot → `done`. The same capture serves as the verification of the previous action and the coordinate check for the next one.
+So the enforced flow is: screenshot → action → screenshot (verify effect + check the next target) → action → … → screenshot → `done`/`stop`. The same capture serves as the verification of the previous action and the coordinate check for the next one.
+
+**Terminating a task** — `stop` (active abort) additionally requires a screenshot no older than 60 seconds, even when the task performed no pointer action, so the final state is captured. `done` and `stop` both return a **progress report**:
+
+- overall instruction,
+- current step (`N/M` when `step_index`/`step_total` are set),
+- number of pointer actions performed in the task,
+- elapsed task time in seconds.
+
+The rendered tool result includes this report, and the agent is instructed to report the same progress to the user in the conversation.
 
 - A successful `screen_viewer` capture by the same agent satisfies the check; captures taken by another agent or a parallel conversation do not.
 - If `screen-viewer` is not installed, pointer actions are refused with an instruction to install or call it.
@@ -39,13 +48,13 @@ The rejection is deliberate: it prevents blind coordinate guessing and unverifie
 |---|---|---|
 | `start` | `instruction`, optional `step`, `step_index`, `step_total` | Begin a visible mouse task; the overlay shows `dsh鼠标接管中` plus task and step. |
 | `step` | `step`, optional `step_index`, `step_total` | Update the current step line of the running task. |
-| `done` | — | Complete the task; the overlay switches to `未操控`. |
+| `done` | — | Complete the task; the overlay switches to `未操控`; the result includes the progress report. |
 | `move` | `x`, `y` | Move the pointer to a screen position. |
 | `click` | optional `x`, `y`; `button` (`left`/`right`/`middle`); `count` 1–3 | Move if coordinates are given, then click. |
 | `drag` | `from_x`, `from_y`, `to_x`, `to_y`; `button` | Press, drag with a slower natural profile, release. |
 | `scroll` | `delta` (positive = up), `times` | Wheel steps with natural pauses. |
-| `stop` | — | Abort the task; the overlay switches back to `未操控`. |
-| `status` | — | Report task (instruction, step, progress), takeover, overlay and cursor state. |
+| `stop` | — | Abort the task after a fresh screenshot; the overlay switches back to `未操控`; the result includes the progress report. |
+| `status` | — | Report task (instruction, step, progress, action count, elapsed time), takeover, overlay and cursor state. |
 
 Coordinates are absolute screen pixels. Use `screen_viewer` from the screen-viewer bundle to see the screen and the cursor first.
 

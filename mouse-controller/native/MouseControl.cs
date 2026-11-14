@@ -441,6 +441,9 @@ namespace DshMouse
         string taskStep = "";
         int taskIndex;
         int taskTotal;
+        int taskActionCount;
+        long taskElapsedMs;
+        readonly System.Diagnostics.Stopwatch taskClock = new System.Diagnostics.Stopwatch();
 
         public MouseApp(bool debug)
         {
@@ -550,6 +553,8 @@ namespace DshMouse
             stopped = true;
             abortMove = true;
             takeover = false;
+            taskElapsedMs = taskClock.ElapsedMilliseconds;
+            taskClock.Stop();
             taskActive = false;
             try
             {
@@ -706,6 +711,9 @@ namespace DshMouse
                             taskStep = "执行 " + name;
                             taskIndex = 0;
                             taskTotal = 0;
+                            taskActionCount = 0;
+                            taskElapsedMs = 0;
+                            taskClock.Restart();
                             taskActive = true;
                         }
                         takeover = true;
@@ -719,6 +727,7 @@ namespace DshMouse
                         if (x < 0 || y < 0) throw new Exception("move requires x and y screen coordinates");
                         bool ok = MoveHuman(x, y, duration);
                         if (!ok) { Respond(id, StoppedJson()); return; }
+                        taskActionCount++;
                         Respond(id, "{\"ok\":true,\"cursor\":" + CursorJson() + "}");
                         return;
                     }
@@ -744,6 +753,7 @@ namespace DshMouse
                             ClickButton(button, false);
                             if (i + 1 < count) SleepRandom(70, 150);
                         }
+                        taskActionCount++;
                         Respond(id, "{\"ok\":true,\"cursor\":" + CursorJson() + ",\"clicked\":" + count + "}");
                         return;
                     }
@@ -764,6 +774,7 @@ namespace DshMouse
                         SleepRandom(70, 150);
                         ClickButton(button, false);
                         if (!ok) { Respond(id, StoppedJson()); return; }
+                        taskActionCount++;
                         Respond(id, "{\"ok\":true,\"cursor\":" + CursorJson() + "}");
                         return;
                     }
@@ -780,6 +791,7 @@ namespace DshMouse
                             Native.SendMouse(Native.MOUSEEVENTF_WHEEL, 0, 0, unchecked((uint)delta));
                             SleepRandom(60, 160);
                         }
+                        taskActionCount++;
                         Respond(id, "{\"ok\":true}");
                         return;
                     }
@@ -851,10 +863,12 @@ namespace DshMouse
 
         string TaskJson()
         {
+            long elapsedMs = taskActive ? taskClock.ElapsedMilliseconds : taskElapsedMs;
             return "{\"active\":" + Json.Bool(taskActive)
                 + ",\"instruction\":\"" + Json.Escape(taskInstruction) + "\""
                 + ",\"step\":\"" + Json.Escape(taskStep) + "\""
-                + ",\"index\":" + taskIndex + ",\"total\":" + taskTotal + "}";
+                + ",\"index\":" + taskIndex + ",\"total\":" + taskTotal
+                + ",\"actions\":" + taskActionCount + ",\"elapsedSeconds\":" + (elapsedMs / 1000) + "}";
         }
 
         void BeginTaskFromCommand(Dictionary<string, object> cmd)
@@ -863,6 +877,9 @@ namespace DshMouse
             taskStep = Json.Str(cmd, "step", "准备开始");
             taskIndex = Json.Int(cmd, "index", 0);
             taskTotal = Json.Int(cmd, "total", 0);
+            taskActionCount = 0;
+            taskElapsedMs = 0;
+            taskClock.Restart();
             taskActive = true;
             takeover = true;
         }
@@ -876,6 +893,8 @@ namespace DshMouse
 
         void EndTask()
         {
+            taskElapsedMs = taskClock.ElapsedMilliseconds;
+            taskClock.Stop();
             taskActive = false;
             takeover = false;
         }

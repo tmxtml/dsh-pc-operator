@@ -73,10 +73,18 @@
 操作成功后，在再次调用 `screen_viewer` 确认效果之前：
 
 - 继续执行 move / click / drag / scroll 会被拒绝；
-- `start`、`step`、`done` 会被拒绝；
-- 仅 `status` 和 `stop`（中止）仍可用。
+- `start`、`step`、`done`、`stop` 会被拒绝；
+- 仅 `status` 仍可用。
 
-因此正常流程被强制为：`screen_viewer` → 定坐标 → `mouse_controller` 操作 → `screen_viewer` 确认效果（同时作为下一次操作的坐标检查）→ 下一次操作 → … → `screen_viewer` → `done`。如果没安装 `screen-viewer`，鼠标操作将全部被拒绝。
+因此正常流程被强制为：`screen_viewer` → 定坐标 → `mouse_controller` 操作 → `screen_viewer` 确认效果（同时作为下一次操作的坐标检查）→ 下一次操作 → … → `screen_viewer` → `done`/`stop`。
+
+### 终止任务：先截图，再汇报进度
+
+- **主动终止（`stop`）**：必须先有一次 60 秒内的截图，即使任务中还没执行过指针操作，也会强制要求先截图，确保当时的屏幕状态被记录下来。
+- **`done` / `stop` 都会返回任务进度报告**：总指令、当前步骤（N/M）、任务内已执行的指针操作次数、任务耗时（秒）。
+- 这份进度报告会出现在工具结果中；工具描述要求 agent 在对话回复里把当前任务完成进度汇报给用户。
+
+如果没安装 `screen-viewer`，鼠标操作将全部被拒绝。
 
 ### 紧急停止
 

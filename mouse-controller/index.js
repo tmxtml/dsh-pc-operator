@@ -280,7 +280,7 @@ function createMouseController() {
     if (exec.signal.aborted && !['status', 'start', 'stop', 'step', 'done'].includes(action)) {
       throw new Error('mouse action was cancelled')
     }
-    if (!['status', 'stop'].includes(action)) {
+    if (action !== 'status') {
       const unverified = unverifiedActionFor(exec.agent ?? null)
       if (unverified) {
         throw new Error(`action "${action}" was rejected: the previous pointer action (${unverified.ageSeconds}s ago) has not been verified. Call screen_viewer now and check the result (cursor position, window state, effect) before continuing.`)
@@ -346,6 +346,11 @@ function createMouseController() {
     }
 
     if (action === 'stop') {
+      const capture = captureFor(exec.agent ?? null)
+      const age = capture ? Date.now() - capture.at : Infinity
+      if (!capture || age > SCREENSHOT_MAX_AGE_MS) {
+        throw new Error('action "stop" was rejected: take a screenshot with screen_viewer first, so the final state is captured and the progress report reflects a fresh view of the screen.')
+      }
       const result = checkResult(await send(state, { cmd: 'stop' }, exec.signal))
       return { action, ok: true, takeover: false, overlay: result.overlay !== false, task: result.task ?? null, cursor: result.cursor ?? null }
     }
@@ -429,12 +434,24 @@ function isFastInteger(value) {
   return typeof value === 'number' && Number.isInteger(value)
 }
 
+function progressReport(task) {
+  if (!task) return 'no task summary is available'
+  const parts = []
+  parts.push(`instruction "${task.instruction || '鼠标操控任务'}"`)
+  if (task.total > 0 && task.index > 0) parts.push(`step ${task.index}/${task.total} "${task.step}"`)
+  else if (task.step) parts.push(`current step "${task.step}"`)
+  parts.push(`${task.actions ?? 0} pointer action(s)`)
+  parts.push(`${task.elapsedSeconds ?? 0}s elapsed`)
+  return parts.join('; ')
+}
+
 function detailText(value) {
   if (!value) return ''
   const progress = taskProgress(value.task)
   if (value.action === 'status') {
     if (value.task && value.task.active) {
       return `Mouse task is in progress${progress}. Overall instruction: ${value.task.instruction}. `
+        + `${value.task.actions ?? 0} pointer action(s) so far, ${value.task.elapsedSeconds ?? 0}s elapsed. `
         + 'The top-right overlay shows dsh鼠标接管中 with the task and current step.'
     }
     return 'Mouse takeover is off; the top-right overlay shows 未操控.'
@@ -445,8 +462,14 @@ function detailText(value) {
       + 'The top-right overlay shows dsh鼠标接管中 with the task and current step.'
   }
   if (value.action === 'step') return `Mouse task step updated${progress}. The overlay shows dsh鼠标接管中.`
-  if (value.action === 'done') return 'Mouse task completed; the top-right overlay switches to 未操控.'
-  if (value.action === 'stop') return 'Mouse task aborted; the top-right overlay switches to 未操控.'
+  if (value.action === 'done') {
+    return 'Mouse task completed; the top-right overlay switches to 未操控. '
+      + `Progress report — ${progressReport(value.task)}. Report this progress to the user in the conversation.`
+  }
+  if (value.action === 'stop') {
+    return 'Mouse task aborted; the top-right overlay switches to 未操控. '
+      + `Progress report — ${progressReport(value.task)}. Report this progress to the user in the conversation.`
+  }
   const cursor = value.cursor ? ` The cursor is now at (${value.cursor.x}, ${value.cursor.y}).` : ''
   if (value.action === 'move') return `Moved the pointer with human-like acceleration, tremor and settling.${cursor}`
   if (value.action === 'click') return `Clicked ${value.button ?? 'left'} ${value.clicked ?? 1} time(s).${cursor}`
@@ -473,8 +496,9 @@ export function apply(ctx) {
       + '(curved paths, acceleration/deceleration, tremor, overshoot and settling). '
       + 'Coordinate check requirement: before every pointer action (move, click, drag, scroll) call screen_viewer and verify the target coordinates in the returned screenshot. '
       + 'A pointer action is rejected unless a screenshot was taken after the previous pointer action, by the same agent, and within the last 60 seconds. '
-      + 'Post-action verification requirement: after every pointer action completes, call screen_viewer again to check the effect. Until that screenshot is taken, further pointer actions, step and done are rejected (status and stop remain available). '
+      + 'Post-action verification requirement: after every pointer action completes, call screen_viewer again to check the effect. Until that screenshot is taken, further pointer actions, start, step, done and stop are rejected (status remains available). '
       + 'Task protocol: call start with the overall instruction (instruction) and optionally the first step, update progress with step, and call done when the task is complete. '
+      + 'Actively stopping a task (stop) also requires a fresh screenshot first; both stop and done return a progress report (overall instruction, current step N/M, pointer action count, elapsed seconds) that you must report to the user in the conversation. '
       + 'While the task is in progress the top-right overlay shows "dsh鼠标接管中" together with the overall instruction and the current step; only done, an aborted stop, or the user\'s Ctrl+D+S+H switches it to "未操控". '
       + 'Pointer actions without an active task start an implicit task. '
       + 'After a Ctrl+D+S+H stop, actions fail and you must not call start again unless the user explicitly asks.',
@@ -484,7 +508,7 @@ export function apply(ctx) {
         action: {
           type: 'string',
           enum: ACTIONS,
-          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it; status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta. Every move/click/drag/scroll requires a fresh screen_viewer capture taken after the previous pointer action, and step/done stay rejected until the action\'s effect is verified by a screenshot.',
+          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it (stop needs a fresh screenshot first); status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta. Every move/click/drag/scroll requires a fresh screen_viewer capture taken after the previous pointer action, and step/done/stop stay rejected until the action\'s effect is verified by a screenshot.',
         },
         x: { type: 'integer', description: 'Target screen x coordinate in pixels.' },
         y: { type: 'integer', description: 'Target screen y coordinate in pixels.' },

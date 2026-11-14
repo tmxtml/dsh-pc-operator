@@ -11,7 +11,7 @@
  * serialize with the mouse controller helper running in another process.
  */
 import { execFile } from 'node:child_process'
-import { readFile, unlink } from 'node:fs/promises'
+import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -85,6 +85,29 @@ function summaryText(value) {
     + ` (screen origin ${value.screenX},${value.screenY}; ${value.bytes} bytes PNG).${cursor}`
 }
 
+
+// Resolve a temporary directory for the capture PNG: an explicit override,
+// then the session workspace's TMP directory (the shared temp convention),
+// then the OS temp directory. The file is deleted right after it is stored.
+async function captureTempDirectory(ctx, exec) {
+  const candidates = []
+  if (process.env.PC_OPERATOR_TMP) candidates.push(process.env.PC_OPERATOR_TMP)
+  const workingDirectory = typeof ctx.get === 'function' ? ctx.get('workingDirectory') : undefined
+  if (workingDirectory !== undefined && exec.agent !== undefined) {
+    try {
+      const cwd = await workingDirectory.ensure(exec.agent, exec.signal)
+      candidates.push(join(cwd, 'TMP'))
+    } catch { /* fall back to the OS temp directory */ }
+  }
+  candidates.push(join(tmpdir(), 'dsh-screen-viewer'))
+  for (const candidate of candidates) {
+    try {
+      await mkdir(candidate, { recursive: true })
+      return candidate
+    } catch { /* try the next candidate */ }
+  }
+  return tmpdir()
+}
 export function apply(ctx) {
   ctx.effect(() => ctx.tools.register({
     name: 'screen_viewer',
@@ -127,7 +150,7 @@ export function apply(ctx) {
       const display = args.monitor !== undefined ? String(clampInt(args.monitor, 0, 15, 0)) : (args.display ?? 'primary')
       const maxWidth = clampInt(args.max_width, 480, 3840, 1600)
       const includeCursor = args.include_cursor !== false
-      const target = join(tmpdir(), `dsh-screen-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.png`)
+      const target = join(await captureTempDirectory(ctx, exec), `screen-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.png`)
       const argv = ['--out', target, '--display', display, '--max-width', String(maxWidth)]
       if (!includeCursor) argv.push('--no-cursor')
       try {

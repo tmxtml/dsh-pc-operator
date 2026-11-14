@@ -18,6 +18,8 @@
 
 Each call runs a fresh native helper process, so screenshots do not serialize behind mouse gestures and can be taken while the mouse is moving.
 
+The transient PNG is written under the current session workspace's `TMP/` directory (falling back to the OS temp directory) and is deleted immediately after it has been stored in the attachment service.
+
 The capture is also recorded as the calling agent's latest coordinate check and effect verification: the `mouse-controller` bundle refuses every pointer action that is not preceded by a screenshot from the same agent taken after the previous pointer action (and no older than 60 seconds), and it refuses the next action, `step` or `done` until the previous pointer action's effect has been verified by a new screenshot. So the normal workflow is: `screen_viewer` → decide coordinates → `mouse_controller` action → `screen_viewer` again to verify the effect and check the next target → next action.
 
 ## Limitations

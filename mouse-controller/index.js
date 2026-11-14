@@ -80,6 +80,15 @@ function requireFreshScreenshot(agent, action) {
   return capture
 }
 
+/** The last pointer action has no screenshot taken after it yet. */
+function unverifiedActionFor(agent) {
+  const lastAction = lastActionFor(agent)
+  if (!lastAction) return null
+  const capture = captureFor(agent)
+  if (capture !== undefined && capture !== null && capture.at > lastAction) return null
+  return { at: lastAction, ageSeconds: Math.max(0, Math.round((Date.now() - lastAction) / 1000)) }
+}
+
 function failureMessage(result) {
   if (result && result.stopped) {
     return 'The user stopped mouse takeover with Ctrl+D+S+H. The task was aborted and the top-right overlay shows 未操控; '
@@ -271,6 +280,12 @@ function createMouseController() {
     if (exec.signal.aborted && !['status', 'start', 'stop', 'step', 'done'].includes(action)) {
       throw new Error('mouse action was cancelled')
     }
+    if (!['status', 'stop'].includes(action)) {
+      const unverified = unverifiedActionFor(exec.agent ?? null)
+      if (unverified) {
+        throw new Error(`action "${action}" was rejected: the previous pointer action (${unverified.ageSeconds}s ago) has not been verified. Call screen_viewer now and check the result (cursor position, window state, effect) before continuing.`)
+      }
+    }
     const state = await ensureDaemon()
     if (state.stopped && !['status', 'start', 'stop', 'step', 'done'].includes(action)) {
       throw new Error(failureMessage({ stopped: true }))
@@ -458,6 +473,7 @@ export function apply(ctx) {
       + '(curved paths, acceleration/deceleration, tremor, overshoot and settling). '
       + 'Coordinate check requirement: before every pointer action (move, click, drag, scroll) call screen_viewer and verify the target coordinates in the returned screenshot. '
       + 'A pointer action is rejected unless a screenshot was taken after the previous pointer action, by the same agent, and within the last 60 seconds. '
+      + 'Post-action verification requirement: after every pointer action completes, call screen_viewer again to check the effect. Until that screenshot is taken, further pointer actions, step and done are rejected (status and stop remain available). '
       + 'Task protocol: call start with the overall instruction (instruction) and optionally the first step, update progress with step, and call done when the task is complete. '
       + 'While the task is in progress the top-right overlay shows "dsh鼠标接管中" together with the overall instruction and the current step; only done, an aborted stop, or the user\'s Ctrl+D+S+H switches it to "未操控". '
       + 'Pointer actions without an active task start an implicit task. '
@@ -468,7 +484,7 @@ export function apply(ctx) {
         action: {
           type: 'string',
           enum: ACTIONS,
-          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it; status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta. Every move/click/drag/scroll requires a fresh screen_viewer capture taken after the previous pointer action.',
+          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it; status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta. Every move/click/drag/scroll requires a fresh screen_viewer capture taken after the previous pointer action, and step/done stay rejected until the action\'s effect is verified by a screenshot.',
         },
         x: { type: 'integer', description: 'Target screen x coordinate in pixels.' },
         y: { type: 'integer', description: 'Target screen y coordinate in pixels.' },

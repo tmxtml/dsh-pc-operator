@@ -1,1 +1,1 @@
-{ "meta": { "title": "屏幕取景器", "description": "截取当前显示器（默认画出鼠标指针），并把截图作为图片直接返回给模型；每次截图同时登记为该 agent 的坐标检查记录，用于满足 mouse_controller“每次操作前必须截图检查”的要求。", "detail": "docs/DETAIL.md" } }
+{ "meta": { "title": "屏幕取景器", "description": "截取当前显示器（默认画出鼠标指针），并把截图作为图片直接返回给模型；截图同时用于满足 mouse_controller 的“操作前检查坐标、操作后确认效果”要求（同一 agent）。", "detail": "docs/DETAIL.md" } }

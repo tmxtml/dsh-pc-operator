@@ -10,20 +10,28 @@
 - Task lifecycle: `start` begins a task with the overall `instruction`, the first `step`, and optional `step_index`/`step_total`; `step` updates the current step as work proceeds; `done` marks the task complete. Pointer actions taken without an active task start an implicit task so the overlay still reports what is happening.
 - Holding **Ctrl+D+S+H** at any time stops the takeover immediately: the overlay switches to `未操控`, any in-progress gesture aborts, the task is cancelled, and the tool refuses further pointer actions. A later `start` is refused for a short cooldown so a stopped task is not instantly re-armed; after that, `start` may only be used when the user explicitly asks to resume.
 
-## Coordinate check requirement
+## Screenshot requirements (before and after every action)
 
-Every pointer action (`move`, `click`, `drag`, `scroll`) must be preceded by a screenshot check:
+Every pointer action (`move`, `click`, `drag`, `scroll`) must be surrounded by screenshots from the **same agent**:
 
-- Call `screen_viewer` (from the `screen-viewer` bundle) and read the returned image before choosing coordinates.
-- `mouse_controller` rejects a pointer action when:
-  - no screenshot is on record for the calling agent,
-  - the last screenshot was taken **before** the previous pointer action, or
-  - the last screenshot is older than **60 seconds**.
+**Before the action** — call `screen_viewer` and read the returned image before choosing coordinates. `mouse_controller` rejects a pointer action when:
+
+- no screenshot is on record for the calling agent,
+- the last screenshot was taken **before** the previous pointer action, or
+- the last screenshot is older than **60 seconds**.
+
+**After the action** — once a pointer action succeeds, call `screen_viewer` again to verify the effect. Until that verification capture arrives:
+
+- further pointer actions are rejected,
+- `start`, `step` and `done` are rejected,
+- only `status` and `stop` (abort) remain available.
+
+So the enforced flow is: screenshot → action → screenshot (verify effect + check the next target) → action → … → screenshot → `done`. The same capture serves as the verification of the previous action and the coordinate check for the next one.
+
 - A successful `screen_viewer` capture by the same agent satisfies the check; captures taken by another agent or a parallel conversation do not.
-- Task control actions (`start`, `step`, `done`, `stop`, `status`) do not touch the pointer and do not require a screenshot.
 - If `screen-viewer` is not installed, pointer actions are refused with an instruction to install or call it.
 
-The rejection is deliberate: it forces screenshot → coordinate decision → action → screenshot before the next action, instead of blind coordinate guessing. The check is coordinated in-process through a shared `globalThis` record, so it works across the two separate bundles without extra configuration.
+The rejection is deliberate: it prevents blind coordinate guessing and unverified actions. The check is coordinated in-process through a shared `globalThis` record, so it works across the two separate bundles without extra configuration.
 
 ## Actions
 

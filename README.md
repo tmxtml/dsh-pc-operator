@@ -60,15 +60,23 @@
 - 未调用 `start` 时直接操作鼠标会自动生成一个隐式任务。
 - `status` 返回任务、接管、浮窗和指针状态；`stop` 中止任务。
 
-### 坐标检查要求（强制）
+### 截图要求（操作前 + 操作后，强制）
 
-**每次指针操作（move / click / drag / scroll）之前，必须先用 `screen_viewer` 截图确认坐标。** `mouse_controller` 会拒绝不满足条件的操作：
+**每次指针操作（move / click / drag / scroll）之前必须先用 `screen_viewer` 截图确认坐标，操作完成后必须再次截图确认效果。** 同一 agent 的成功截图才算数；别的会话/子代理的截图不算。
+
+操作前，以下情况会被拒绝：
 
 - 该 agent 还没有任何截图记录；
 - 最近一次截图发生在**上一次指针操作之前**（即操作后没有重新截图）；
 - 最近一次截图超过 **60 秒**。
 
-同一 agent 的成功截图才算数；别的会话/子代理的截图不算。任务控制动作（`start`/`step`/`done`/`stop`/`status`）不移动指针，不需要截图。正常流程是：`screen_viewer` → 看截图定坐标 → `mouse_controller` 操作 → 下一次操作前再 `screen_viewer`。如果没安装 `screen-viewer`，鼠标操作将全部被拒绝。
+操作成功后，在再次调用 `screen_viewer` 确认效果之前：
+
+- 继续执行 move / click / drag / scroll 会被拒绝；
+- `start`、`step`、`done` 会被拒绝；
+- 仅 `status` 和 `stop`（中止）仍可用。
+
+因此正常流程被强制为：`screen_viewer` → 定坐标 → `mouse_controller` 操作 → `screen_viewer` 确认效果（同时作为下一次操作的坐标检查）→ 下一次操作 → … → `screen_viewer` → `done`。如果没安装 `screen-viewer`，鼠标操作将全部被拒绝。
 
 ### 紧急停止
 

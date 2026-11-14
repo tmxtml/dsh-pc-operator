@@ -1,1 +1,1 @@
-{ "meta": { "title": "Screen viewer", "description": "Captures the current display, with the cursor drawn in, and returns the screenshot to the model as an image.", "detail": "docs/DETAIL.md" } }
+{ "meta": { "title": "Screen viewer", "description": "Captures the current display, with the cursor drawn in, and returns the screenshot to the model as an image. Each capture also satisfies mouse_controller's per-action coordinate check for the same agent.", "detail": "docs/DETAIL.md" } }

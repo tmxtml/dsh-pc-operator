@@ -1,1 +1,1 @@
-{ "meta": { "title": "鼠标控制器", "description": "接近真人的鼠标操控，并在右上角显示任务状态：任务进行中显示“dsh鼠标接管中”+总指令+当前步骤（含 N/M 进度），只有任务完成后才显示“未操控”；按 Ctrl+D+S+H 立即停止接管。", "detail": "docs/DETAIL.md" } }
+{ "meta": { "title": "鼠标控制器", "description": "接近真人的鼠标操控；每次指针操作前必须先用 screen_viewer 截图检查坐标（否则操作被拒绝）。任务进行中右上角显示“dsh鼠标接管中”+总指令+当前步骤（含 N/M 进度），只有任务完成后才显示“未操控”；按 Ctrl+D+S+H 立即停止接管。", "detail": "docs/DETAIL.md" } }

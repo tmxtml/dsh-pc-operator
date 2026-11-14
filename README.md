@@ -39,7 +39,7 @@
 - `max_width`：480–3840，默认 1600，超宽会等比缩小
 - `include_cursor`：默认 `true`，把真实指针画进截图
 
-每次调用都会新截一张图（独立进程），可与鼠标操作真正并行。
+每次调用都会新截一张图（独立进程），可与鼠标操作真正并行。截图同时会登记为该 agent 的“坐标检查”记录，用来满足 `mouse_controller` 的操作前置检查。
 
 ### mouse_controller
 
@@ -59,6 +59,16 @@
 - 任务进行中执行任何 `move`/`click`/`drag`/`scroll` 都不会让浮窗变回未操控；只有 `done`（或中止 `stop` / 热键）才显示「未操控」。
 - 未调用 `start` 时直接操作鼠标会自动生成一个隐式任务。
 - `status` 返回任务、接管、浮窗和指针状态；`stop` 中止任务。
+
+### 坐标检查要求（强制）
+
+**每次指针操作（move / click / drag / scroll）之前，必须先用 `screen_viewer` 截图确认坐标。** `mouse_controller` 会拒绝不满足条件的操作：
+
+- 该 agent 还没有任何截图记录；
+- 最近一次截图发生在**上一次指针操作之前**（即操作后没有重新截图）；
+- 最近一次截图超过 **60 秒**。
+
+同一 agent 的成功截图才算数；别的会话/子代理的截图不算。任务控制动作（`start`/`step`/`done`/`stop`/`status`）不移动指针，不需要截图。正常流程是：`screen_viewer` → 看截图定坐标 → `mouse_controller` 操作 → 下一次操作前再 `screen_viewer`。如果没安装 `screen-viewer`，鼠标操作将全部被拒绝。
 
 ### 紧急停止
 

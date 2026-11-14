@@ -25,6 +25,28 @@ export const inject = ['tools', 'attachments']
 
 const DISPLAY_VALUES = ['primary', 'cursor', 'all']
 
+/**
+ * Coordination record shared with the mouse-controller plugin through
+ * `globalThis`, so a capture can satisfy that plugin's rule that every pointer
+ * action must be preceded by a screenshot taken by the same Agent.
+ */
+const COORDINATION_KEY = Symbol.for('dsh.pc-operator.coordination')
+
+function coordinationStore() {
+  let store = globalThis[COORDINATION_KEY]
+  if (!store) {
+    store = { captures: new WeakMap(), anonymousCapture: null }
+    globalThis[COORDINATION_KEY] = store
+  }
+  return store
+}
+
+function recordCapture(agent, capture) {
+  const store = coordinationStore()
+  if (agent !== undefined && agent !== null) store.captures.set(agent, capture)
+  else store.anonymousCapture = capture
+}
+
 function clampInt(value, min, max, fallback) {
   const number = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(number)) return fallback
@@ -68,7 +90,8 @@ export function apply(ctx) {
     name: 'screen_viewer',
     description: 'Capture the current display and return it as an image you can see. '
       + 'Each call takes a fresh screenshot, so call it again after the screen changes. '
-      + 'The mouse cursor is drawn into the capture by default.',
+      + 'The mouse cursor is drawn into the capture by default. '
+      + 'A successful capture also satisfies mouse_controller\'s requirement that every pointer action be preceded by a coordinate check screenshot from the same agent.',
     parameters: {
       type: 'object',
       properties: {
@@ -131,6 +154,14 @@ export function apply(ctx) {
         }
         const data = await readFile(target)
         const ref = await ctx.attachments.saveImage({ data, mediaType: 'image/png' })
+        recordCapture(exec.agent, {
+          at: Date.now(),
+          display: info.display,
+          cursorX: info.cursorX,
+          cursorY: info.cursorY,
+          width: info.width,
+          height: info.height,
+        })
         return {
           display: info.display,
           screenX: info.screenX,

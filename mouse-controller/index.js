@@ -27,6 +27,58 @@ const COMMAND_TIMEOUT_MS = 120_000
 const HOTKEY_RESTART_COOLDOWN_MS = 10_000
 
 const ACTIONS = ['move', 'click', 'drag', 'scroll', 'start', 'step', 'done', 'stop', 'status']
+const POINTER_ACTIONS = ['move', 'click', 'drag', 'scroll']
+const SCREENSHOT_MAX_AGE_MS = 60_000
+const COORDINATION_KEY = Symbol.for('dsh.pc-operator.coordination')
+
+/**
+ * Coordination record shared with the screen-viewer plugin through `globalThis`.
+ * screen-viewer writes `captures`; this plugin writes `lastActions`. Both maps
+ * are keyed by the calling Agent, so a screenshot only satisfies the same
+ * agent's pointer actions.
+ */
+function coordinationStore() {
+  let store = globalThis[COORDINATION_KEY]
+  if (!store) {
+    store = { captures: new WeakMap(), lastActions: new WeakMap(), anonymousCapture: null, anonymousAction: 0 }
+    globalThis[COORDINATION_KEY] = store
+  }
+  if (store.captures === undefined) store.captures = new WeakMap()
+  if (store.lastActions === undefined) store.lastActions = new WeakMap()
+  return store
+}
+
+function captureFor(agent) {
+  const store = coordinationStore()
+  return agent !== undefined && agent !== null ? store.captures.get(agent) : store.anonymousCapture
+}
+
+function lastActionFor(agent) {
+  const store = coordinationStore()
+  return agent !== undefined && agent !== null ? (store.lastActions.get(agent) ?? 0) : store.anonymousAction
+}
+
+function recordPointerAction(agent) {
+  const store = coordinationStore()
+  const at = Date.now()
+  if (agent !== undefined && agent !== null) store.lastActions.set(agent, at)
+  else store.anonymousAction = at
+}
+
+function requireFreshScreenshot(agent, action) {
+  const capture = captureFor(agent)
+  if (!capture) {
+    throw new Error(`action "${action}" was rejected: no screenshot check is on record. Call screen_viewer first and verify the target coordinates; every pointer action requires a screenshot taken after the previous pointer action.`)
+  }
+  if (capture.at <= lastActionFor(agent)) {
+    throw new Error(`action "${action}" was rejected: the last screenshot (${Math.max(0, Math.round((Date.now() - capture.at) / 1000))}s ago) predates the previous pointer action. Call screen_viewer again to check the current coordinates.`)
+  }
+  const age = Date.now() - capture.at
+  if (age > SCREENSHOT_MAX_AGE_MS) {
+    throw new Error(`action "${action}" was rejected: the last screenshot is ${Math.round(age / 1000)}s old (limit ${Math.round(SCREENSHOT_MAX_AGE_MS / 1000)}s). Call screen_viewer again to check the current coordinates.`)
+  }
+  return capture
+}
 
 function failureMessage(result) {
   if (result && result.stopped) {
@@ -285,13 +337,17 @@ function createMouseController() {
 
     if (state.stopped) throw new Error(failureMessage({ stopped: true }))
 
+    if (POINTER_ACTIONS.includes(action)) requireFreshScreenshot(exec.agent ?? null, action)
+
     if (action === 'move') {
       requireXY(args)
       const result = checkResult(await send(state, {
         cmd: 'move', x: Math.round(args.x), y: Math.round(args.y),
         duration: isFastInteger(args.duration_ms) ? args.duration_ms : 0,
       }, exec.signal))
-      return baseValue(action, result)
+      const value = baseValue(action, result)
+      recordPointerAction(exec.agent ?? null)
+      return value
     }
 
     if (action === 'click') {
@@ -302,7 +358,9 @@ function createMouseController() {
       if (hasX) { command.x = Math.round(args.x); command.y = Math.round(args.y) }
       if (args.duration_ms !== undefined) command.duration = args.duration_ms
       const result = checkResult(await send(state, command, exec.signal))
-      return baseValue(action, result, { clicked: command.count, button: command.button })
+      const value = baseValue(action, result, { clicked: command.count, button: command.button })
+      recordPointerAction(exec.agent ?? null)
+      return value
     }
 
     if (action === 'drag') {
@@ -316,7 +374,9 @@ function createMouseController() {
         button: args.button ?? 'left',
         duration: Number.isInteger(args.duration_ms) ? args.duration_ms : 900,
       }, exec.signal))
-      return baseValue(action, result)
+      const value = baseValue(action, result)
+      recordPointerAction(exec.agent ?? null)
+      return value
     }
 
     if (action === 'scroll') {
@@ -325,7 +385,9 @@ function createMouseController() {
         cmd: 'scroll', delta: args.delta,
         times: Number.isInteger(args.times) ? Math.min(10, Math.max(1, args.times)) : 1,
       }, exec.signal))
-      return baseValue(action, result)
+      const value = baseValue(action, result)
+      recordPointerAction(exec.agent ?? null)
+      return value
     }
 
     throw new Error(`unknown action "${action}"`)
@@ -394,18 +456,19 @@ export function apply(ctx) {
     name: 'mouse_controller',
     description: 'Control the real mouse pointer on this Windows desktop with human-like motion '
       + '(curved paths, acceleration/deceleration, tremor, overshoot and settling). '
+      + 'Coordinate check requirement: before every pointer action (move, click, drag, scroll) call screen_viewer and verify the target coordinates in the returned screenshot. '
+      + 'A pointer action is rejected unless a screenshot was taken after the previous pointer action, by the same agent, and within the last 60 seconds. '
       + 'Task protocol: call start with the overall instruction (instruction) and optionally the first step, update progress with step, and call done when the task is complete. '
       + 'While the task is in progress the top-right overlay shows "dsh鼠标接管中" together with the overall instruction and the current step; only done, an aborted stop, or the user\'s Ctrl+D+S+H switches it to "未操控". '
       + 'Pointer actions without an active task start an implicit task. '
-      + 'After a Ctrl+D+S+H stop, actions fail and you must not call start again unless the user explicitly asks. '
-      + 'Call screen_viewer first when you need to see where to click.',
+      + 'After a Ctrl+D+S+H stop, actions fail and you must not call start again unless the user explicitly asks.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
           enum: ACTIONS,
-          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it; status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta.',
+          description: 'Pointer gesture or task control. start begins a visible task; step updates its current step; done completes it; stop aborts it; status reports task and takeover state. move needs x/y; click optionally x/y; drag needs from_x/from_y/to_x/to_y; scroll needs delta. Every move/click/drag/scroll requires a fresh screen_viewer capture taken after the previous pointer action.',
         },
         x: { type: 'integer', description: 'Target screen x coordinate in pixels.' },
         y: { type: 'integer', description: 'Target screen y coordinate in pixels.' },

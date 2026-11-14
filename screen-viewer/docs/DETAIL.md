@@ -18,6 +18,8 @@
 
 Each call runs a fresh native helper process, so screenshots do not serialize behind mouse gestures and can be taken while the mouse is moving.
 
+The capture is also recorded as the calling agent's latest coordinate check: the `mouse-controller` bundle refuses every pointer action that is not preceded by a screenshot from the same agent taken after the previous pointer action (and no older than 60 seconds). So the normal workflow is: `screen_viewer` → decide coordinates → `mouse_controller` action → `screen_viewer` again before the next action.
+
 ## Limitations
 
 - Windows only: the native helper `native/ScreenCapture.exe` uses GDI and Win32 cursor APIs.

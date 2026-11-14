@@ -1,0 +1,1 @@
+{ "meta": { "title": "Mouse controller", "description": "Human-like mouse control with a task-aware top-right overlay: while a task is in progress it shows \"dsh鼠标接管中\" plus the overall instruction and current step, and only shows \"未操控\" once the task is done; Ctrl+D+S+H stops the takeover.", "detail": "docs/DETAIL.md" } }

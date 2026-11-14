@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t">
+  <title id="t">Screen viewer</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="8" width="56" height="40" rx="5" fill="#111827" stroke="#60a5fa" stroke-width="2"/>
+  <rect x="8" y="12" width="48" height="32" rx="2" fill="url(#g)" opacity="0.35"/>
+  <path d="M20 28h8M24 24v8" stroke="#bfdbfe" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 30l12 5-5 2-2 5z" fill="#f8fafc" stroke="#0f172a" stroke-width="1"/>
+  <path d="M24 48h16v6H24z" fill="#1f2937"/>
+  <path d="M18 54h28" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="51" cy="15" r="4" fill="#ef4444"/>
+</svg>

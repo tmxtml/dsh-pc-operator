@@ -1,0 +1,1 @@
+{ "meta": { "title": "Screen viewer", "description": "Captures the current display, with the cursor drawn in, and returns the screenshot to the model as an image.", "detail": "docs/DETAIL.md" } }

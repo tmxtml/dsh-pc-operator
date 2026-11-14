@@ -1,0 +1,27 @@
+{
+  "name": "@local/dsh-mouse-controller",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Human-like real mouse control with a takeover overlay and a Ctrl+D+S+H stop hotkey.",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "native/MouseControl.exe",
+    "native/MouseControl.cs",
+    "native/build.bat"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

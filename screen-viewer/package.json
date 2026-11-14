@@ -1,0 +1,27 @@
+{
+  "name": "@local/dsh-screen-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Screenshot the current display and return it to the model as an image.",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "native/ScreenCapture.exe",
+    "native/ScreenCapture.cs",
+    "native/build.bat"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

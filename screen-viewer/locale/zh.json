@@ -1,0 +1,1 @@
+{ "meta": { "title": "屏幕取景器", "description": "截取当前显示器（默认画出鼠标指针），并把截图作为图片直接返回给模型。", "detail": "docs/DETAIL.md" } }

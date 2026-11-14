@@ -1,0 +1,3 @@
+- insert:
+    - id: mouse-controller
+      name: '@local/dsh-mouse-controller'
